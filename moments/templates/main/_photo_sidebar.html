@@ -34,14 +34,23 @@
     <div id="description">
       <p>
         {% if photo.description %}
-        {{ photo.description }}
+          {{ photo.description }}
+        {% elif photo.auto_alt_text %}
+          {{ photo.auto_alt_text }}
+          <span class="badge text-bg-secondary ms-1">Auto</span>
+
+          <!-- One-click: adopt AI text as manual description -->
+          <form method="post"
+                action="{{ url_for('main.edit_description', photo_id=photo.id) }}"
+                class="d-inline ms-2">
+            {{ description_form.csrf_token }}
+            <input type="hidden" name="description" value="{{ photo.auto_alt_text }}">
+            <button class="btn btn-sm btn-outline-primary">
+              Convert to manual
+            </button>
+          </form>
         {% else %}
-        <small class="text-muted">No description</small>
-        {% endif %}
-        {% if current_user == photo.author %}
-        <a id="description-btn" href="#!">
-          <small>{{ render_icon('pencil-fill') }}</small>
-        </a>
+          <span class="text-muted">No description</span>
         {% endif %}
       </p>
     </div>
@@ -58,20 +67,35 @@
     <div id="tags">
       <p>
         {% if photo.tags %}
-        {% for tag in photo.tags %}
-        <a class="badge text-bg-secondary rounded-pill text-decoration-none" href="{{ url_for('.show_tag', tag_id=tag.id) }}" target="_blank">
-          {{ render_icon('tag-fill') }} {{ tag.name }}
-        </a>
-        {% endfor %}
+          {% for tag in photo.tags %}
+            <a class="badge text-bg-secondary rounded-pill text-decoration-none me-1"
+              href="{{ url_for('.show_tag', tag_id=tag.id) }}" target="_blank">
+              {{ render_icon('tag-fill') }} {{ tag.name }}
+            </a>
+          {% endfor %}
         {% else %}
-        <small class="text-muted">No tags</small>
+          <small class="text-muted">No tags</small>
         {% endif %}
+
         {% if current_user == photo.author %}
-        <a id="tag-btn" href="#!">
-          <small>{{ render_icon('pencil-fill') }}</small>
-        </a>
+          <a id="tag-btn" href="#!">
+            <small>{{ render_icon('pencil-fill') }}</small>
+          </a>
         {% endif %}
       </p>
+
+      {# --- ML recognized objects (clickable, link to search) --- #}
+      {% set objects = (photo.auto_objects if photo.auto_objects is defined
+                        else (photo.auto_tags_json | default('[]') | tojson | loads)) %}
+      {% if objects %}
+        <div class="mt-2">
+          <small class="text-muted me-2">Recognized objects:</small>
+          {% for o in objects %}
+            <a class="badge text-bg-light rounded-pill text-decoration-none me-1"
+              href="{{ url_for('.search', q=o) }}">{{ o }}</a>
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
     {% if current_user == photo.author %}
     <div id="tag-form">

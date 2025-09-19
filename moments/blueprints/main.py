@@ -9,6 +9,9 @@ from moments.forms.main import CommentForm, DescriptionForm, TagForm
 from moments.models import Collection, Comment, Follow, Notification, Photo, Tag, User
 from moments.notifications import push_collect_notification, push_comment_notification
 from moments.utils import flash_errors, redirect_back, rename_image, resize_image, validate_image
+import json
+from moments.ml.gemini import generate_alt_text, generate_objects
+
 
 main_bp = Blueprint('main', __name__)
 
@@ -63,8 +66,29 @@ def search():
     elif category == 'tag':
         pagination = Tag.query.whooshee_search(q).paginate(page=page, per_page=per_page)
     else:
+        # Keep Whooshee results (fast + ranked)
         pagination = Photo.query.whooshee_search(q).paginate(page=page, per_page=per_page)
-    results = pagination.items
+        results = list(pagination.items)
+
+        # Augment with ML fields (auto_alt_text + auto_tags_json)
+        needle = q.lower()
+        have_ids = {p.id for p in results}
+        for p in Photo.query.all():
+            if p.id in have_ids:
+                continue
+            haystack = " ".join(filter(None, [
+                p.description or "",
+                getattr(p, "auto_alt_text", "") or "",
+            ])).lower()
+
+            try:
+                objs = json.loads(p.auto_tags_json or "[]")
+            except Exception:
+                objs = []
+            haystack += " " + " ".join(objs)
+
+            if needle in haystack:
+                results.append(p)
     return render_template('main/search.html', q=q, results=results, pagination=pagination, category=category)
 
 
@@ -129,13 +153,37 @@ def upload():
         f = request.files.get('file')
         if not validate_image(f.filename):
             return 'Invalid image.', 400
+
         filename = rename_image(f.filename)
+        # Save original
         f.save(current_app.config['MOMENTS_UPLOAD_PATH'] / filename)
+        # Create resized variants
         filename_s = resize_image(f, filename, current_app.config['MOMENTS_PHOTO_SIZES']['small'])
         filename_m = resize_image(f, filename, current_app.config['MOMENTS_PHOTO_SIZES']['medium'])
+
         photo = Photo(
-            filename=filename, filename_s=filename_s, filename_m=filename_m, author=current_user._get_current_object()
+            filename=filename,
+            filename_s=filename_s,
+            filename_m=filename_m,
+            author=current_user._get_current_object()
         )
+
+        # 🔹 ML ENRICHMENT (add this block)
+        try:
+            abs_path = current_app.config['MOMENTS_UPLOAD_PATH'] / filename
+
+            # Only auto-generate alt text if user hasn't provided a description
+            if not photo.description:
+                photo.auto_alt_text = generate_alt_text(abs_path)
+
+            # Always store detected objects (used for keyword search)
+            objects = generate_objects(abs_path)
+            photo.auto_tags_json = json.dumps(objects)
+        except Exception:
+            # Fail-soft: don’t block uploads if ML fails
+            photo.auto_alt_text = photo.auto_alt_text or None
+            photo.auto_tags_json = photo.auto_tags_json or json.dumps([])
+
         db.session.add(photo)
         db.session.commit()
     return render_template('main/upload.html')

@@ -7,7 +7,7 @@ from moments.blueprints.main import main_bp
 from moments.blueprints.user import user_bp
 from moments.core.commands import register_commands
 from moments.core.errors import register_error_handlers
-from moments.core.extensions import avatars, bootstrap, csrf, db, dropzone, login_manager, mail, whooshee
+from moments.core.extensions import avatars, bootstrap, csrf, db, dropzone, login_manager, mail, whooshee, migrate
 from moments.core.logging import register_logging
 from moments.core.request import register_request_handlers
 from moments.core.templating import register_template_handlers
@@ -21,6 +21,7 @@ def create_app(config_name):
 
     bootstrap.init_app(app)
     db.init_app(app)
+    migrate.init_app(app, db)
     login_manager.init_app(app)
     mail.init_app(app)
     dropzone.init_app(app)

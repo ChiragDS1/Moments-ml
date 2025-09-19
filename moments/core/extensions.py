@@ -8,7 +8,11 @@ from flask_whooshee import Whooshee
 from flask_wtf import CSRFProtect
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
+from flask_migrate import Migrate
 
+db = SQLAlchemy()
+whooshee = Whooshee()
+migrate = Migrate()
 
 class Base(DeclarativeBase):
     metadata = MetaData(

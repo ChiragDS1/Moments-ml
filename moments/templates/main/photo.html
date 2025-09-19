@@ -10,7 +10,12 @@
   <div class="col-lg-8">
     <div class="photo">
       <a href="{{ url_for('.get_image', filename=photo.filename) }}" target="_blank">
-        <img class="img-fluid" src="{{ url_for('.get_image', filename=photo.filename_m) }}">
+        {% set alt = photo.description or photo.auto_alt_text %}
+        <img
+          class="img-fluid"
+          src="{{ url_for('.get_image', filename=photo.filename_m) }}"
+          alt="{{ alt or '' }}"
+        >
       </a>
       <span class="photo-bottom"></span>
     </div>

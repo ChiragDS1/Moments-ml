@@ -279,41 +279,42 @@ photo_tag = db.Table(
 )
 
 
-@whooshee.register_model('description')
+from sqlalchemy import String, Text
+import json
+
+@whooshee.register_model('description', 'auto_alt_text')  # include auto alt in full-text index
 class Photo(db.Model):
     __tablename__ = 'photo'
 
     id: Mapped[int] = mapped_column(primary_key=True)
     description: Mapped[Optional[str]] = mapped_column(String(500))
+    # NEW FIELDS ↓
+    auto_alt_text: Mapped[Optional[str]] = mapped_column(String(160))  # ML alt if user left description blank
+    auto_tags_json: Mapped[Optional[str]] = mapped_column(Text)        # JSON list: ["dog","bridge","sunset"]
+    # existing fields...
     filename: Mapped[str] = mapped_column(String(64))
     filename_s: Mapped[str] = mapped_column(String(64))
     filename_m: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
     can_comment: Mapped[bool] = mapped_column(default=True)
     flag: Mapped[int] = mapped_column(default=0)
-
     author_id: Mapped[int] = mapped_column(ForeignKey('user.id', ondelete='CASCADE'))
 
     author: Mapped['User'] = relationship(back_populates='photos')
-    comments: WriteOnlyMapped['Comment'] = relationship(
-        back_populates='photo', cascade='all, delete-orphan', passive_deletes=True
-    )
-    collections: WriteOnlyMapped['Collection'] = relationship(
-        back_populates='photo', cascade='all, delete-orphan', passive_deletes=True
-    )
+    comments: WriteOnlyMapped['Comment'] = relationship(back_populates='photo', cascade='all, delete-orphan', passive_deletes=True)
+    collections: WriteOnlyMapped['Collection'] = relationship(back_populates='photo', cascade='all, delete-orphan', passive_deletes=True)
     tags: Mapped[list['Tag']] = relationship(secondary=photo_tag, back_populates='photos', passive_deletes=True)
 
+    # helper to use the JSON as a Python list
     @property
-    def collectors_count(self):
-        return db.session.scalar(select(func.count(Collection.user_id)).filter_by(photo_id=self.id))
-
-    @property
-    def comments_count(self):
-        return db.session.scalar(select(func.count(Comment.id)).filter_by(photo_id=self.id))
+    def auto_objects(self) -> list[str]:
+        try:
+            return json.loads(self.auto_tags_json or "[]")
+        except Exception:
+            return []
 
     def __repr__(self):
         return f'Photo {self.id}: {self.filename}'
-
 
 @whooshee.register_model('name')
 class Tag(db.Model):
