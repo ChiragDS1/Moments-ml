@@ -55,15 +55,19 @@ $ cd Moments-ml
 
 With PDM (recommended):
 Install dependencies with [PDM](https://pdm.fming.dev):
+```
 python -m pip install --user pdm
 pdm venv create -w
 pdm install
-
+```
 Or with virtualenv + pip:
 python -m venv .venv
 # Windows:
+```
 .venv\Scripts\activate
+```
 # macOS/Linux:
+```
 source .venv/bin/activate
 
 pip install -r requirements.txt
@@ -72,18 +76,21 @@ pip install -r requirements.txt
 
 ## Configure environment variables:
 Create a file named .env in the project root:
+```
 GEMINI_API_KEY=your_api_key_here
 GEMINI_MODEL=gemini-1.5-flash
-
+```
 
 ## Initialize the database:
 # If migrations/ doesn’t exist yet
+```
 pdm run flask db init
-
+```
 # Create and apply the schema
+```
 pdm run flask db migrate -m "init schema"
 pdm run flask db upgrade
-
+```
 > [!TIP]
 > If you don't have PDM installed, you can create a virtual environment with `venv` and install dependencies with `pip install -r requirements.txt`.
 
